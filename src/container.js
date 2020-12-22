@@ -1,146 +1,152 @@
-import React from 'react';
-import fp from 'lodash/fp';
+import React from "react";
+import fp from "lodash/fp";
 
-import createStoreSubscription from './lib/createStoreSubscription.js';
-import getListenerChildContext from './lib/getListenerChildContext.js';
-import getDistributorChildContext from './lib/getDistributorChildContext.js';
-import getContainerContext from './lib/getContainerContext.js';
+import createStoreSubscription from "./lib/createStoreSubscription.js";
+import getListenerChildContext from "./lib/getListenerChildContext.js";
+import getDistributorChildContext from "./lib/getDistributorChildContext.js";
+import getContainerContext from "./lib/getContainerContext.js";
 
-import {shallowEquals} from './utils.js';
+import { shallowEquals } from "./utils.js";
 
 export default ({
-    konttiType, 
+  konttiType,
 
-    // Subscriber props
-    isPure,
+  // Subscriber props
+  isPure,
 
-    // Distributor props
-    createStore,
+  // Distributor props
+  createStore,
 
-    options = {},
-    propTypes = {},
-    subscribedKeys = [], 
+  options = {},
+  propTypes = {},
+  subscribedKeys = [],
 
-    ViewComponent,
+  ViewComponent,
 }) => {
-    const {
-        propTypes: componentPropTypes,
-        contextTypes: componentContextTypes
-    } = options;
+  const {
+    propTypes: componentPropTypes,
+    contextTypes: componentContextTypes,
+  } = options;
 
-    const isSubscriber = !fp.isEmpty(subscribedKeys);
-    const isDistributor = !fp.isNil(createStore);
+  const isSubscriber = !fp.isEmpty(subscribedKeys);
+  const isDistributor = !fp.isNil(createStore);
 
-    class ContainerComponent extends React.Component {
-        /* Statics: 
+  class ContainerComponent extends React.Component {
+    /* Statics: 
             _storeChanging,
             _storeChanged,
             _propsChanged,
         */
 
-        componentWillMount() {
-            if (isDistributor)
-                this._store = createStore();
-            else 
-                this._store = this.context._store;
+    UNSAFE_componentWillMount() {
+      if (isDistributor) this._store = createStore();
+      else this._store = this.context._store;
 
-            if (isSubscriber)
-                this._storeSubscription = createStoreSubscription(this, subscribedKeys)
+      if (isSubscriber)
+        this._storeSubscription = createStoreSubscription(this, subscribedKeys);
 
-            ViewComponent.propTypes = Object.assign({}, 
-                ContainerComponent.propTypes,
-                ViewComponent.propTypes,
-                componentPropTypes,
-                propTypes,
-            )
-            ContainerComponent.propTypes = {};
+      ViewComponent.propTypes = Object.assign(
+        {},
+        ContainerComponent.propTypes,
+        ViewComponent.propTypes,
+        componentPropTypes,
+        propTypes
+      );
+      ContainerComponent.propTypes = {};
 
-            /* ContextTypes */
-            ViewComponent.contextTypes = fp.omit('_store', Object.assign({}, 
-                ViewComponent.contextTypes,
-                componentContextTypes,
-                ContainerComponent.contextTypes,
-                ContainerComponent.childContextTypes
-            ))
-        }
-
-        getChildContext() {
-            return Object.assign({},
-                isSubscriber && getListenerChildContext(this),
-                isDistributor && getDistributorChildContext(this, konttiType)
-            )
-        }
-
-        componentWillReceiveProps() {
-            if (isSubscriber)
-                this._propsChanged = true;
-        }
-
-        shouldComponentUpdate(nextProps) {
-            this._storeChanging = false;
-
-            const {
-                props,
-
-                _storeState, 
-                _storeChanged
-            } = this;
-
-            const nextStoreState = this._store.get(...subscribedKeys);
-
-            if (isPure && (!_storeChanged || shallowEquals(_storeState, nextStoreState)))
-                return false;
-
-            else if (shallowEquals(props, nextProps) && shallowEquals(_storeState, nextStoreState))
-                return false;   
-
-            this._storeState = nextStoreState;
-            return true;
-        }
-
-        componentDidUpdate() {
-			if (!this._storeChanging)
-                this._storeChanged = false;
-            
-            this._propsChanged = false;
-		}
-
-        componentWillUnmount() {
-            this._isUnmounted = true;
-
-            if (isSubscriber)
-                this._storeSubscription();
-        }
-
-        render() {
-            const {children, ...restOfProps} = this.props;
-
-            const props = !isSubscriber ? restOfProps : Object.assign({}, 
-                restOfProps,
-                this._store.get(...subscribedKeys)
-            );
-
-            return (
-                <ViewComponent
-                    ref={cmp => {
-                        this.ViewComponent = cmp
-                    }} 
-                    {...props} 
-                    >
-                    {children}
-                </ViewComponent>
-            )
-        }
+      /* ContextTypes */
+      ViewComponent.contextTypes = fp.omit(
+        "_store",
+        Object.assign(
+          {},
+          ViewComponent.contextTypes,
+          componentContextTypes,
+          ContainerComponent.contextTypes,
+          ContainerComponent.childContextTypes
+        )
+      );
     }
 
-    /* Setup Container contextTypes */
-    const {
-        containerContextTypes = {},
-        containerChildContextTypes = {}
-    } = getContainerContext(konttiType, isSubscriber);
+    getChildContext() {
+      return Object.assign(
+        {},
+        isSubscriber && getListenerChildContext(this),
+        isDistributor && getDistributorChildContext(this, konttiType)
+      );
+    }
 
-    ContainerComponent.contextTypes = containerContextTypes;
-    ContainerComponent.childContextTypes = containerChildContextTypes;
+    UNSAFE_componentWillReceiveProps() {
+      if (isSubscriber) this._propsChanged = true;
+    }
 
-    return ContainerComponent;
-}
+    shouldComponentUpdate(nextProps) {
+      this._storeChanging = false;
+
+      const {
+        props,
+
+        _storeState,
+        _storeChanged,
+      } = this;
+
+      const nextStoreState = this._store.get(...subscribedKeys);
+
+      if (
+        isPure &&
+        (!_storeChanged || shallowEquals(_storeState, nextStoreState))
+      )
+        return false;
+      else if (
+        shallowEquals(props, nextProps) &&
+        shallowEquals(_storeState, nextStoreState)
+      )
+        return false;
+
+      this._storeState = nextStoreState;
+      return true;
+    }
+
+    componentDidUpdate() {
+      if (!this._storeChanging) this._storeChanged = false;
+
+      this._propsChanged = false;
+    }
+
+    componentWillUnmount() {
+      this._isUnmounted = true;
+
+      if (isSubscriber) this._storeSubscription();
+    }
+
+    render() {
+      const { children, ...restOfProps } = this.props;
+
+      const props = !isSubscriber
+        ? restOfProps
+        : Object.assign({}, restOfProps, this._store.get(...subscribedKeys));
+
+      return (
+        <ViewComponent
+          ref={(cmp) => {
+            this.ViewComponent = cmp;
+          }}
+          {...props}
+        >
+          {children}
+        </ViewComponent>
+      );
+    }
+  }
+
+  /* Setup Container contextTypes */
+  const {
+    containerContextTypes = {},
+    containerChildContextTypes = {},
+  } = getContainerContext(konttiType, isSubscriber);
+
+  ContainerComponent.contextTypes = containerContextTypes;
+  ContainerComponent.childContextTypes = containerChildContextTypes;
+
+  return ContainerComponent;
+};
+
